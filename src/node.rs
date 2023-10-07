@@ -1,6 +1,6 @@
 use std::{fs::read_dir, path::{PathBuf, Path}};
 
-use macroquad::{prelude::*, rand::ChooseRandom};
+use macroquad::prelude::*;
 
 use crate::helper::{random_col, dir_size, draw_centered_text, bytes_to_text};
 
@@ -20,7 +20,7 @@ impl Node {
 		// let name = format!("{drive}:/");
 		let name = "C:/Windows/Logs/".to_owned();
 		let bytes = dir_size(Path::new(&name));
-		println!("{bytes:?}");
+		println!("{:?}", bytes.1);
 
 		Self { 
 			path_prefix: String::new(),
@@ -28,7 +28,7 @@ impl Node {
 			bytes: bytes.0,
 			children: Vec::new(),
 			rect: Rect { x: 0.0, y: 0.0, w: 1.0, h: 1.0 },
-			color: random_col(),
+			color: random_col(1.0),
 			hovered: false,
 		}
 	}
@@ -115,7 +115,7 @@ impl Node {
 				bytes: size,
 				children: Vec::new(),
 				rect: Rect::new(1.0, 1.0, 1.0, 1.0),
-				color: random_col(),
+				color: random_col(if metadata.is_dir() { 1.0 } else { 0.2 }),
 				hovered: false,
 			};
 

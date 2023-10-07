@@ -34,4 +34,6 @@ TODO:
 * asynchrony
 * list all folders without permissions
 * sort by size/sort alphabetically/shuffle
+* area scales - linear/square/logarithmic
+* collapse with RMB
 */
