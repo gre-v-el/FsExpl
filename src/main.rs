@@ -32,4 +32,6 @@ TODO:
 * borders, show path
 * ux: empty -> choose path / show all
 * asynchrony
+* list all folders without permissions
+* sort by size/sort alphabetically/shuffle
 */

@@ -1,5 +1,5 @@
 use std::ops::{Add, Mul};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::{io, fs};
 
 use macroquad::prelude::*;
@@ -41,26 +41,50 @@ pub fn random_col() -> Color {
 	col_from_hsv(gen_range(0.0, 1.0), gen_range(0.4, 1.0), 1.0)
 }
 
-pub fn dir_size(path: &str) -> io::Result<u64> {
-    fn dir_size(path: &Path) -> io::Result<u64> {
-
+pub fn dir_size(path: &Path) -> (u64, Vec<PathBuf>) {
+	
+	fn dir_size(path: &Path, denied: &mut Vec<PathBuf>) -> u64 {
 		let mut total_size = 0;
 
-		for entry in fs::read_dir(path)? {
-			let entry = entry?;
-			let metadata = entry.metadata()?;
-	
-			total_size += match metadata {
-				data if data.is_dir() && entry.file_name() == "System Volume Information" => 0,
-				data if data.is_dir() => dir_size(&entry.path())?,
-				data => data.len(),
+
+		let iterator = match fs::read_dir(path) {
+			Ok(i) => i,
+			Err(_) => {
+				denied.push(path.to_path_buf());
+				return 0;
+			},
+		};
+
+		for entry in iterator {
+			let entry = match entry {
+				Ok(e) => e,
+				Err(_) => {
+					denied.push(path.to_path_buf());
+					continue;
+				}
 			};
+
+			let metadata = match entry.metadata() {
+				Ok(m) => m,
+				Err(_) => {
+					denied.push(entry.path());
+					continue;
+				}
+			};
+			
+			if metadata.is_dir() {
+				total_size += dir_size(&entry.path(), denied);
+			}
+			else {
+				total_size += metadata.len();
+			}
 		}
 		
-		Ok(total_size)
+		total_size
     }
-
-    dir_size(Path::new(path))
+	
+	let mut denied = Vec::new();
+    (dir_size(Path::new(path), &mut denied), denied)
 }
 
 pub fn draw_centered_text(text: &str, size: f32, pos: Vec2) {

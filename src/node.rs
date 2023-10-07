@@ -1,4 +1,4 @@
-use std::fs::read_dir;
+use std::{fs::read_dir, path::{PathBuf, Path}};
 
 use macroquad::{prelude::*, rand::ChooseRandom};
 
@@ -18,19 +18,14 @@ pub struct Node {
 impl Node {
 	pub fn root(drive: char) -> Self{
 		// let name = format!("{drive}:/");
-		let name = "D:/pliki/".to_owned();
-		let bytes = match dir_size(&name) {
-			Ok(v) => v,
-			Err(e) => {
-				println!("{e:?}");
-				panic!();
-			},
-		};
+		let name = "C:/Windows/Logs/".to_owned();
+		let bytes = dir_size(Path::new(&name));
+		println!("{bytes:?}");
 
 		Self { 
 			path_prefix: String::new(),
 			name,
-			bytes,
+			bytes: bytes.0,
 			children: Vec::new(),
 			rect: Rect { x: 0.0, y: 0.0, w: 1.0, h: 1.0 },
 			color: random_col(),
@@ -59,7 +54,7 @@ impl Node {
 		if self.children.len() == 0 {
 			self.hovered = self.rect.contains(pos);
 			if self.hovered && clicked{
-				self.split();
+				println!("{:?}", self.split());
 			}
 		}
 		else {
@@ -70,20 +65,46 @@ impl Node {
 		}		
 	}
 
-	fn split(&mut self) {
+	fn split(&mut self) -> Vec<PathBuf> {
+		let mut denied = Vec::new();
+
 		let mut full_path = self.path_prefix.to_owned();
 		full_path.push_str(&self.name);
+		let full_path = PathBuf::from(full_path);
 
 		let mut path_prefix = self.path_prefix.clone();
 		path_prefix.push_str(&self.name);
-		path_prefix.push_str("/");
+		path_prefix.push('/');
 
-		for dir in read_dir(&full_path).unwrap() {
-			let dir = dir.unwrap();
-			if dir.file_name() == "System Volume Information" { continue; }
-			let metadata = dir.metadata().unwrap();
+		let iter = match read_dir(&full_path) {
+			Ok(i) => i,
+			Err(_) => {
+				denied.push(full_path);
+				return denied;
+			},
+		};
+
+		for dir in iter {
+			let dir = match dir {
+				Ok(d) => d,
+				Err(_) => {
+					denied.push(full_path);
+					return denied;
+				},
+			};
+
+			let metadata = match dir.metadata() {
+				Ok(m) => m,
+				Err(_) => {
+					denied.push(dir.path());
+					return denied;
+				},
+			};
+			
 			let size = if metadata.is_dir() {
-				dir_size(dir.path().to_str().unwrap()).unwrap()
+				let (size, errors) = dir_size(&dir.path());
+				denied.extend(errors);
+				size
 			} else {
 				metadata.len()
 			};
@@ -101,7 +122,11 @@ impl Node {
 			self.children.push(node);
 		}
 
+		self.children.sort_unstable_by(|n1, n2| {n1.bytes.cmp(&n2.bytes)});
+
 		Self::place_children(&mut self.children, self.rect);
+
+		denied
 	}
 
 	fn place_children(slice: &mut [Node], rect: Rect) {
@@ -127,10 +152,19 @@ impl Node {
 			}
 		}
 
-		if ((size_sum/2) as i128 - half_sum as i128).abs() > 
+		if ((size_sum/2) as i128 - half_sum as i128).abs() >=
 		   ((size_sum/2) as i128 - (half_sum as i128 - slice[split_index - 1].bytes as i128)).abs() {
 			split_index -= 1;
 			half_sum -= slice[split_index].bytes;
+		}
+
+		if split_index == 0 {
+			split_index = 1;
+			half_sum = slice[0].bytes;
+		}
+		if split_index == slice.len() {
+			split_index = slice.len() - 1;
+			half_sum = size_sum - slice[slice.len() - 1].bytes;
 		}
 
 		let proportion = half_sum as f32 / size_sum as f32;
