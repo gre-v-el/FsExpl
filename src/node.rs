@@ -14,27 +14,43 @@ pub struct Node {
 	small_rect: Rect,
 	color: Color,
 	hovered: bool,
+	is_leaf: bool,
 }
 
 impl Node {
-	pub fn new(path_prefix: String, name: String, rect: Rect, is_dir: bool) -> (Self, Vec<PathBuf>){
-		let mut full_path = path_prefix.clone();
-		full_path.push_str(&name);
-		full_path.push('/');
-		let (bytes, denied) = dir_size(Path::new(&full_path));
+	pub fn new(path: &Path, rect: Rect) -> (Self, Vec<PathBuf>){
+		let (bytes, denied) = dir_size(path);
 
 		let mut small_rect = rect.clone();
 		shrink_rect_margin(&mut small_rect, 0.05);
 
+		let mut pre_path = path.to_string_lossy().to_string();
+		let mut name = None;
+
+		if pre_path.ends_with('/') {
+			pre_path.pop();
+		}
+		
+		let mut last_slash = None;
+		for (i, ch) in pre_path.chars().enumerate() {
+			if ch == '/' || ch == '\\' {
+				last_slash = Some(i);
+			}
+		}
+		if let Some(last) = last_slash {
+			name = Some(pre_path.split_off(last + 1));
+		}
+
 		(Self { 
-			name,
-			path_prefix,
+			name: name.unwrap_or_else(|| String::new()),
+			path_prefix: pre_path,
 			bytes: bytes,
 			children: Vec::new(),
 			big_rect: rect,
 			small_rect, 
-			color: random_col(if is_dir {1.0} else {0.15}),
+			color: random_col(if path.is_dir() {1.0} else {0.15}),
 			hovered: false,
+			is_leaf: true,
 		}, denied)
 	}
 
@@ -169,6 +185,7 @@ impl Node {
 				small_rect: Rect::new(0.9, 0.9, 0.8, 0.8),
 				color: random_col(if metadata.is_dir() { 1.0 } else { 0.3 }),
 				hovered: false,
+				is_leaf: true,
 			};
 
 			self.children.push(node);

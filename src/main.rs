@@ -2,7 +2,7 @@ mod controls;
 mod helper;
 mod node;
 
-use std::env;
+use std::{env, path::Path};
 
 use macroquad::prelude::*;
 use node::Node;
@@ -13,7 +13,7 @@ async fn main() {
 
 	let mut controls = controls::Controls::new();
 	
-	let (mut root, denied) = Node::new("".to_owned(), "D:/pliki/programowanie/".to_owned(), Rect::new(0.0, 0.0, 1.0, 1.0), true);
+	let (mut root, denied) = Node::new(Path::new("D:/pliki/programowanie/"), Rect::new(0.0, 0.0, 1.0, 1.0));
 	println!("{:?}", denied);
 
 	loop {
