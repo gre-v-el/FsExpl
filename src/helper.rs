@@ -46,7 +46,6 @@ pub fn dir_size(path: &Path) -> (u64, Vec<PathBuf>) {
 	fn dir_size(path: &Path, denied: &mut Vec<PathBuf>) -> u64 {
 		let mut total_size = 0;
 
-
 		let iterator = match fs::read_dir(path) {
 			Ok(i) => i,
 			Err(_) => {
@@ -87,7 +86,7 @@ pub fn dir_size(path: &Path) -> (u64, Vec<PathBuf>) {
     (dir_size(Path::new(path), &mut denied), denied)
 }
 
-pub fn draw_centered_text(text: &str, size: f32, pos: Vec2) {
+pub fn _draw_centered_text(text: &str, size: f32, pos: Vec2) {
 	let text_size = measure_text(text, None, 16, 1.0/16.0*size);
 	draw_text_ex(
 		text, 

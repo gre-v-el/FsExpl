@@ -13,7 +13,7 @@ async fn main() {
 
 	let mut controls = controls::Controls::new();
 	
-	let (mut root, denied) = Node::new(Path::new("D:/pliki/programowanie/"), Rect::new(0.0, 0.0, 1.0, 1.0));
+	let (mut root, denied) = Node::new(Path::new("D:/pliki/programowanie"), Rect::new(0.0, 0.0, 1.0, 1.0));
 	println!("{:?}", denied);
 
 	loop {

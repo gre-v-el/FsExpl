@@ -133,6 +133,7 @@ impl Node {
 	}
 
 	fn split(&mut self) -> Vec<PathBuf> {
+		// all paths that the process could reach due to lack of permissions
 		let mut denied = Vec::new();
 
 		let mut full_path = self.path_prefix.to_owned();
@@ -199,6 +200,7 @@ impl Node {
 	}
 
 	fn place_children(slice: &mut [Node], rect: Rect) {
+		// end condition - give all space if only one node is left
 		if slice.len() == 1 {
 			slice[0].big_rect = rect;
 			slice[0].small_rect = rect.clone();
@@ -215,6 +217,7 @@ impl Node {
 		let mut half_sum = 0;
 		let mut split_index = 0;
 
+		// find the index in slice, where [0, split_index) and [split_index, length) are as evenly split as possible
 		for node in slice.iter() {
 			half_sum += node.bytes;
 			split_index += 1;
@@ -223,12 +226,14 @@ impl Node {
 			}
 		}
 
+		// correct the split_index if overshoot
 		if ((size_sum/2) as i128 - half_sum as i128).abs() >=
 		   ((size_sum/2) as i128 - (half_sum as i128 - slice[split_index - 1].bytes as i128)).abs() {
 			split_index -= 1;
 			half_sum -= slice[split_index].bytes;
 		}
 
+		// shouldn't ever happen, but if so this prevents infinite recursion
 		if split_index == 0 {
 			split_index = 1;
 			half_sum = slice[0].bytes;
@@ -238,6 +243,7 @@ impl Node {
 			half_sum = size_sum - slice[slice.len() - 1].bytes;
 		}
 
+		// split the rectangle
 		let proportion = half_sum as f32 / size_sum as f32;
 		let mut rect1 = rect.clone();
 		let mut rect2 = rect.clone();
@@ -253,6 +259,7 @@ impl Node {
 			rect2.y += rect1.h;
 		}
 		
+		// divide further
 		Self::place_children(&mut slice[..split_index], rect1);
 		Self::place_children(&mut slice[split_index..], rect2);
 	}
