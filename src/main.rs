@@ -23,7 +23,7 @@ async fn main() {
 		set_camera(controls.camera());
 		root.draw();
 
-		root.handle_mouse(*controls.mouse_world(), is_mouse_button_pressed(MouseButton::Left));
+		root.handle_mouse(*controls.mouse_world(), is_mouse_button_pressed(MouseButton::Left), is_mouse_button_pressed(MouseButton::Right));
 		controls.update();
 
 		next_frame().await;

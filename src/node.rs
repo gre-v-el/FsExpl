@@ -39,49 +39,61 @@ impl Node {
 		if let Some(last) = last_slash {
 			name = Some(pre_path.split_off(last + 1));
 		}
-
-
+		
 		let mut children = Vec::new();
 		let mut bytes = 0;
 
-		let iterator = match fs::read_dir(path) {
-			Ok(i) => i,
-			Err(_) => {
-				denied.push(path.to_path_buf());
-				return None;
-			},
-		};
-
-		for entry in iterator {
-			let entry = match entry {
-				Ok(e) => e,
-				Err(_) => {
-					denied.push(path.to_path_buf());
-					continue;
-				}
-			};
-
-			let metadata = match entry.metadata() {
+		if path.is_file() {
+			let metadata = match path.metadata() {
 				Ok(m) => m,
 				Err(_) => {
-					denied.push(entry.path());
-					continue;
+					denied.push(path.to_owned());
+					return None;
 				}
 			};
-			
-			if metadata.is_dir() {
-				let child = Node::new(&entry.path(), Rect::new(1.0, 1.0, 1.0, 1.0), denied);
-				if let Some(child) = child {
-					bytes += child.bytes();
-					children.push(child);
-				}
+			bytes = metadata.len();
+		}
+		else {
+			let iterator = match fs::read_dir(path) {
+				Ok(i) => i,
+				Err(_) => {
+					denied.push(path.to_path_buf());
+					return None;
+				},
+			};
+	
+			for entry in iterator {
+				let entry = match entry {
+					Ok(e) => e,
+					Err(_) => {
+						denied.push(path.to_path_buf());
+						continue;
+					}
+				};
+	
+				// let metadata = match entry.metadata() {
+				// 	Ok(m) => m,
+				// 	Err(_) => {
+				// 		denied.push(entry.path());
+				// 		continue;
+				// 	}
+				// };
+				
+				// if metadata.is_dir() {
+					let child = Node::new(&entry.path(), Rect::new(1.0, 1.0, 1.0, 1.0), denied);
+					if let Some(child) = child {
+						bytes += child.bytes();
+						children.push(child);
+					}
+				// }
+				// else {
+				// 	bytes += metadata.len();
+				// }
 			}
-			else {
-				bytes += metadata.len();
-			}
+	
+			children.sort_unstable_by(|n1, n2| {n1.bytes.cmp(&n2.bytes)});
 		}
 
-		children.sort_unstable_by(|n1, n2| {n1.bytes.cmp(&n2.bytes)});
 
 
 		Some(
@@ -162,20 +174,38 @@ impl Node {
 		}
 	}
 
-	pub fn handle_mouse(&mut self, pos: Vec2, clicked: bool) {
+	// returns true if child wants to collapse parent
+	pub fn handle_mouse(&mut self, pos: Vec2, clicked_l: bool, clicked_r: bool) -> bool {
 		if self.is_leaf {
 			self.hovered = self.big_rect.contains(pos);
-			if self.hovered && clicked{
+			if self.hovered && clicked_l && self.children.len() != 0 {
 				self.is_leaf = false;				
 				Self::place_children(&mut self.children, self.small_rect);
+			}
+			else if self.hovered && clicked_r {
+				return true;
 			}
 		}
 		else {
 			self.hovered = false;
+			let mut should_collapse = false;
 			for child in &mut self.children {
-				child.handle_mouse(pos, clicked);
+				should_collapse |= child.handle_mouse(pos, clicked_l, clicked_r)
+			}
+			if should_collapse {
+				self.collapse_recursive();
 			}
 		}		
+
+		false
+	}
+
+	pub fn collapse_recursive(&mut self) {
+		self.is_leaf = true;
+
+		for child in &mut self.children {
+			child.collapse_recursive();
+		}
 	}
 
 	fn place_children(slice: &mut [Node], rect: Rect) {
