@@ -41,7 +41,7 @@ pub fn random_col(brightness: f32) -> Color {
 	col_from_hsv(gen_range(0.0, 1.0), gen_range(0.4, 1.0), brightness)
 }
 
-pub fn dir_size(path: &Path) -> (u64, Vec<PathBuf>) {
+pub fn _dir_size(path: &Path) -> (u64, Vec<PathBuf>) {
 	
 	fn dir_size(path: &Path, denied: &mut Vec<PathBuf>) -> u64 {
 		let mut total_size = 0;

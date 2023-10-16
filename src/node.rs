@@ -1,8 +1,8 @@
-use std::{fs::read_dir, path::{PathBuf, Path}};
+use std::{fs::{read_dir, self}, path::{PathBuf, Path}};
 
 use macroquad::prelude::*;
 
-use crate::helper::{random_col, dir_size, bytes_to_text, shrink_rect_margin};
+use crate::helper::{random_col, bytes_to_text, shrink_rect_margin};
 
 #[derive(Debug)]
 pub struct Node {
@@ -18,8 +18,7 @@ pub struct Node {
 }
 
 impl Node {
-	pub fn new(path: &Path, rect: Rect) -> (Self, Vec<PathBuf>){
-		let (bytes, denied) = dir_size(path);
+	pub fn new(path: &Path, rect: Rect, denied: &mut Vec<PathBuf>) -> Option<Self> {
 
 		let mut small_rect = rect.clone();
 		shrink_rect_margin(&mut small_rect, 0.05);
@@ -41,21 +40,67 @@ impl Node {
 			name = Some(pre_path.split_off(last + 1));
 		}
 
-		(Self { 
-			name: name.unwrap_or_else(|| String::new()),
-			path_prefix: pre_path,
-			bytes: bytes,
-			children: Vec::new(),
-			big_rect: rect,
-			small_rect, 
-			color: random_col(if path.is_dir() {1.0} else {0.15}),
-			hovered: false,
-			is_leaf: true,
-		}, denied)
+
+		let mut children = Vec::new();
+		let mut bytes = 0;
+
+		let iterator = match fs::read_dir(path) {
+			Ok(i) => i,
+			Err(_) => {
+				denied.push(path.to_path_buf());
+				return None;
+			},
+		};
+
+		for entry in iterator {
+			let entry = match entry {
+				Ok(e) => e,
+				Err(_) => {
+					denied.push(path.to_path_buf());
+					continue;
+				}
+			};
+
+			let metadata = match entry.metadata() {
+				Ok(m) => m,
+				Err(_) => {
+					denied.push(entry.path());
+					continue;
+				}
+			};
+			
+			if metadata.is_dir() {
+				let child = Node::new(&entry.path(), Rect::new(1.0, 1.0, 1.0, 1.0), denied);
+				if let Some(child) = child {
+					bytes += child.bytes();
+					children.push(child);
+				}
+			}
+			else {
+				bytes += metadata.len();
+			}
+		}
+
+		children.sort_unstable_by(|n1, n2| {n1.bytes.cmp(&n2.bytes)});
+
+
+		Some(
+			Self {
+				name: name.unwrap_or_else(|| String::from("-")),
+				path_prefix: pre_path,
+				bytes: bytes,
+				children,
+				big_rect: rect,
+				small_rect, 
+				color: random_col(if path.is_dir() {1.0} else {0.15}),
+				hovered: false,
+				is_leaf: true,
+			}
+		)
 	}
 
 	pub fn draw(&self) {
-		if self.children.len() == 0 {			
+		if self.is_leaf {			
 			
 			let mut half_rect_size = vec2(self.big_rect.w, self.big_rect.h*0.5);
 			let margin = half_rect_size.min_element() * 0.1;
@@ -118,10 +163,11 @@ impl Node {
 	}
 
 	pub fn handle_mouse(&mut self, pos: Vec2, clicked: bool) {
-		if self.children.len() == 0 {
+		if self.is_leaf {
 			self.hovered = self.big_rect.contains(pos);
 			if self.hovered && clicked{
-				println!("{:?}", self.split());
+				self.is_leaf = false;				
+				Self::place_children(&mut self.children, self.small_rect);
 			}
 		}
 		else {
@@ -130,73 +176,6 @@ impl Node {
 				child.handle_mouse(pos, clicked);
 			}
 		}		
-	}
-
-	fn split(&mut self) -> Vec<PathBuf> {
-		// all paths that the process could reach due to lack of permissions
-		let mut denied = Vec::new();
-
-		let mut full_path = self.path_prefix.to_owned();
-		full_path.push_str(&self.name);
-		let full_path = PathBuf::from(full_path);
-
-		let mut path_prefix = self.path_prefix.clone();
-		path_prefix.push_str(&self.name);
-		path_prefix.push('/');
-
-		let iter = match read_dir(&full_path) {
-			Ok(i) => i,
-			Err(_) => {
-				denied.push(full_path);
-				return denied;
-			},
-		};
-
-		for dir in iter {
-			let dir = match dir {
-				Ok(d) => d,
-				Err(_) => {
-					denied.push(full_path);
-					return denied;
-				},
-			};
-
-			let metadata = match dir.metadata() {
-				Ok(m) => m,
-				Err(_) => {
-					denied.push(dir.path());
-					return denied;
-				},
-			};
-			
-			let size = if metadata.is_dir() {
-				let (size, errors) = dir_size(&dir.path());
-				denied.extend(errors);
-				size
-			} else {
-				metadata.len()
-			};
-			
-			let node = Node {
-				path_prefix: path_prefix.clone(),
-				name: dir.file_name().into_string().unwrap(),
-				bytes: size,
-				children: Vec::new(),
-				big_rect: Rect::new(1.0, 1.0, 1.0, 1.0),
-				small_rect: Rect::new(0.9, 0.9, 0.8, 0.8),
-				color: random_col(if metadata.is_dir() { 1.0 } else { 0.3 }),
-				hovered: false,
-				is_leaf: true,
-			};
-
-			self.children.push(node);
-		}
-
-		self.children.sort_unstable_by(|n1, n2| {n1.bytes.cmp(&n2.bytes)});
-
-		Self::place_children(&mut self.children, self.small_rect);
-
-		denied
 	}
 
 	fn place_children(slice: &mut [Node], rect: Rect) {
@@ -262,5 +241,9 @@ impl Node {
 		// divide further
 		Self::place_children(&mut slice[..split_index], rect1);
 		Self::place_children(&mut slice[split_index..], rect2);
+	}
+
+	pub fn bytes(&self) -> u64 {
+		self.bytes
 	}
 }
