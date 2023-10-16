@@ -2,7 +2,7 @@ use std::{fs::read_dir, path::{PathBuf, Path}};
 
 use macroquad::prelude::*;
 
-use crate::helper::{random_col, dir_size, draw_centered_text, bytes_to_text};
+use crate::helper::{random_col, dir_size, bytes_to_text, shrink_rect_margin};
 
 #[derive(Debug)]
 pub struct Node {
@@ -10,40 +10,91 @@ pub struct Node {
 	name: String,
 	bytes: u64,
 	children: Vec<Node>,
-	rect: Rect,
+	big_rect: Rect,
+	small_rect: Rect,
 	color: Color,
 	hovered: bool,
 }
 
 impl Node {
-	pub fn root(drive: char) -> Self{
-		// let name = format!("{drive}:/");
-		let name = "C:/Windows/Logs/".to_owned();
-		let bytes = dir_size(Path::new(&name));
-		println!("{:?}", bytes.1);
+	pub fn new(path_prefix: String, name: String, rect: Rect, is_dir: bool) -> (Self, Vec<PathBuf>){
+		let mut full_path = path_prefix.clone();
+		full_path.push_str(&name);
+		full_path.push('/');
+		let (bytes, denied) = dir_size(Path::new(&full_path));
 
-		Self { 
-			path_prefix: String::new(),
+		let mut small_rect = rect.clone();
+		shrink_rect_margin(&mut small_rect, 0.05);
+
+		(Self { 
 			name,
-			bytes: bytes.0,
+			path_prefix,
+			bytes: bytes,
 			children: Vec::new(),
-			rect: Rect { x: 0.0, y: 0.0, w: 1.0, h: 1.0 },
-			color: random_col(1.0),
+			big_rect: rect,
+			small_rect, 
+			color: random_col(if is_dir {1.0} else {0.15}),
 			hovered: false,
-		}
+		}, denied)
 	}
 
 	pub fn draw(&self) {
-		if self.children.len() == 0 {
-			draw_rectangle(self.rect.x, self.rect.y, self.rect.w, self.rect.h, self.color);
+		if self.children.len() == 0 {			
+			
+			let mut half_rect_size = vec2(self.big_rect.w, self.big_rect.h*0.5);
+			let margin = half_rect_size.min_element() * 0.1;
+			half_rect_size -= 2.0*margin;
 
-			draw_centered_text(&self.name, self.rect.w/5.0, self.rect.center());
+			draw_rectangle(self.big_rect.x, self.big_rect.y, self.big_rect.w, self.big_rect.h, self.color);
+
+			let upper_text_dim = measure_text(&self.name, None, 16, 1.0);
+			let lower_text_dim = measure_text(&bytes_to_text(self.bytes), None, 16, 1.0);
+
+			let upper_text_size = vec2(upper_text_dim.width, upper_text_dim.height);
+			let lower_text_size = vec2(lower_text_dim.width, lower_text_dim.height);
+
+			let upper_text_max_scale = (half_rect_size / upper_text_size).min_element();
+			let lower_text_max_scale = (half_rect_size / lower_text_size).min_element();
+
+			let scale = upper_text_max_scale.min(lower_text_max_scale);
+
+			draw_text_ex(
+				&self.name, 
+				self.big_rect.center().x - upper_text_dim.width * 0.5 * scale, 
+				self.big_rect.center().y - margin - (upper_text_dim.height - upper_text_dim.offset_y)*scale, 
+				TextParams { 
+					font: None,
+					font_size: 16, 
+					font_scale: scale, 
+					font_scale_aspect: 1.0, 
+					rotation: 0.0, 
+					color: WHITE,
+				},
+			);
 
 			if self.hovered {
-				draw_centered_text(&bytes_to_text(self.bytes), self.rect.w/7.0, self.rect.center() + vec2(0.0, 0.1));
+				draw_text_ex(
+					&bytes_to_text(self.bytes), 
+					self.big_rect.center().x - lower_text_dim.width * 0.5 * scale, 
+					self.big_rect.center().y + margin + (lower_text_dim.offset_y)*scale, 
+					TextParams { 
+						font: None,
+						font_size: 16, 
+						font_scale: scale, 
+						font_scale_aspect: 1.0, 
+						rotation: 0.0, 
+						color: WHITE,
+					},
+				);
 			}
 		}
 		else {
+			let mut color = self.color.clone();
+			color.r *= 0.7;
+			color.g *= 0.7;
+			color.b *= 0.7;
+			draw_rectangle(self.big_rect.x, self.big_rect.y, self.big_rect.w, self.big_rect.h, color);
+
 			for child in &self.children {
 				child.draw();
 			}
@@ -52,7 +103,7 @@ impl Node {
 
 	pub fn handle_mouse(&mut self, pos: Vec2, clicked: bool) {
 		if self.children.len() == 0 {
-			self.hovered = self.rect.contains(pos);
+			self.hovered = self.big_rect.contains(pos);
 			if self.hovered && clicked{
 				println!("{:?}", self.split());
 			}
@@ -114,8 +165,9 @@ impl Node {
 				name: dir.file_name().into_string().unwrap(),
 				bytes: size,
 				children: Vec::new(),
-				rect: Rect::new(1.0, 1.0, 1.0, 1.0),
-				color: random_col(if metadata.is_dir() { 1.0 } else { 0.2 }),
+				big_rect: Rect::new(1.0, 1.0, 1.0, 1.0),
+				small_rect: Rect::new(0.9, 0.9, 0.8, 0.8),
+				color: random_col(if metadata.is_dir() { 1.0 } else { 0.3 }),
 				hovered: false,
 			};
 
@@ -124,14 +176,16 @@ impl Node {
 
 		self.children.sort_unstable_by(|n1, n2| {n1.bytes.cmp(&n2.bytes)});
 
-		Self::place_children(&mut self.children, self.rect);
+		Self::place_children(&mut self.children, self.small_rect);
 
 		denied
 	}
 
 	fn place_children(slice: &mut [Node], rect: Rect) {
 		if slice.len() == 1 {
-			slice[0].rect = rect;
+			slice[0].big_rect = rect;
+			slice[0].small_rect = rect.clone();
+			shrink_rect_margin(&mut slice[0].small_rect, 0.05);
 			return;
 		}
 

@@ -2,15 +2,19 @@ mod controls;
 mod helper;
 mod node;
 
+use std::env;
+
 use macroquad::prelude::*;
 use node::Node;
 
 #[macroquad::main("fsexpl")]
 async fn main() {
+	env::set_var("RUST_BACKTRACE", "1");
 
 	let mut controls = controls::Controls::new();
 	
-	let mut root = Node::root('D');
+	let (mut root, denied) = Node::new("".to_owned(), "D:/pliki/programowanie/".to_owned(), Rect::new(0.0, 0.0, 1.0, 1.0), true);
+	println!("{:?}", denied);
 
 	loop {
 		clear_background(BLACK);
@@ -27,8 +31,6 @@ async fn main() {
 
 /*
 TODO:
-* recursive -> queue / while / iterative
-* text placement
 * borders, show path
 * ux: empty -> choose path / show all
 * asynchrony
@@ -36,4 +38,5 @@ TODO:
 * sort by size/sort alphabetically/shuffle
 * area scales - linear/square/logarithmic
 * collapse with RMB
+* precompute per-frame calculations
 */

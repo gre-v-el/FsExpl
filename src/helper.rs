@@ -108,7 +108,18 @@ pub fn bytes_to_text(bytes: u64) -> String {
 	let units = ["", "K", "M", "G", "T", "P", "E"];
 	let order = if bytes == 0 { 0 } else { ((bytes as f32).log2() * 0.1) as usize };
 	let order = order.min(units.len() - 1);
-	let display_number = bytes as f32 / 1024u32.pow(order as u32) as f32;
+	let display_number = bytes as f32 / 1024f32.powf(order as f32);
 	let dn_digits = if display_number == 0.0 { 1 } else { display_number.log10() as usize + 1 };
 	return format!("{:.2$}{}B", display_number, units[order], (3 - dn_digits.min(3)));
+}
+
+pub fn shrink_rect(rect: &mut Rect, amount: f32) {
+	rect.x += amount;
+	rect.y += amount;
+	rect.w -= 2.0*amount;
+	rect.h -= 2.0*amount;
+}
+
+pub fn shrink_rect_margin(rect: &mut Rect, percentage: f32) {
+	shrink_rect(rect, percentage * rect.w.min(rect.h));
 }
