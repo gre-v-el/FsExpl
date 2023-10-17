@@ -1,4 +1,4 @@
-use std::{fs::{read_dir, self}, path::{PathBuf, Path}};
+use std::{fs, path::{PathBuf, Path}};
 
 use macroquad::prelude::*;
 
@@ -111,6 +111,12 @@ impl Node {
 		)
 	}
 
+	pub fn get_full_path(&self) -> String {
+		let mut path = self.path_prefix.clone();
+		path.push_str(&self.name);
+		return path;
+	}
+
 	pub fn draw(&self) {
 		if self.is_leaf {			
 			
@@ -174,30 +180,45 @@ impl Node {
 		}
 	}
 
-	// returns true if child wants to collapse parent
-	pub fn handle_mouse(&mut self, pos: Vec2, clicked_l: bool, clicked_r: bool) -> bool {
+	// (tooltip, collapse parent)
+	pub fn handle_mouse(&mut self, pos: Vec2, clicked_l: bool, clicked_r: bool) -> (Option<String>, bool) {
+		let mut tooltip = None;
+
 		if self.is_leaf {
 			self.hovered = self.big_rect.contains(pos);
+			if self.hovered {
+				tooltip = Some(self.get_full_path());
+			}
+
 			if self.hovered && clicked_l && self.children.len() != 0 {
 				self.is_leaf = false;				
 				Self::place_children(&mut self.children, self.small_rect);
 			}
 			else if self.hovered && clicked_r {
-				return true;
+				return (tooltip, true);
 			}
 		}
 		else {
 			self.hovered = false;
+
 			let mut should_collapse = false;
 			for child in &mut self.children {
-				should_collapse |= child.handle_mouse(pos, clicked_l, clicked_r)
+				let resp = child.handle_mouse(pos, clicked_l, clicked_r);
+				should_collapse |= resp.1;
+				if resp.0.is_some() {
+					tooltip = resp.0;
+				}
 			}
 			if should_collapse {
 				self.collapse_recursive();
 			}
+
+			if self.big_rect.contains(pos) && !self.small_rect.contains(pos) {
+				tooltip = Some(self.get_full_path())
+			}
 		}		
 
-		false
+		(tooltip, false)
 	}
 
 	pub fn collapse_recursive(&mut self) {
