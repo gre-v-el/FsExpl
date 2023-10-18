@@ -1,10 +1,12 @@
 mod controls;
 mod helper;
 mod node;
+mod tree;
 
-use std::{env, path::Path};
+use std::{env, path::{Path, PathBuf}};
 
-use macroquad::{prelude::*, ui::{widgets::{Window, Group}, root_ui, hash}};
+use egui_macroquad::{macroquad, egui::{Window, Pos2, TextEdit, ScrollArea}};
+use macroquad::prelude::*;
 use node::Node;
 
 #[macroquad::main("fsexpl")]
@@ -13,14 +15,23 @@ async fn main() {
 
 	let mut controls = controls::Controls::new();
 	
-	let mut denied = Vec::new();
+	let mut denied: Vec<PathBuf> = Vec::new();
 
-	let mut root = Node::new(Path::new("C:/Users/Public/"), Rect::new(0.0, 0.0, 1.0, 1.0), &mut denied).unwrap();
+	let mut root: Option<Node> = None;
 
-	let mut last_mouse_move = 0.0;
+	let mut last_mouse_move = 0.0; // used for tooltip
+	let mut dragged_since_rmb_down = vec2(0.0, 0.0); // used to dermine if a folder should collapse
+
+
+	let mut path_input_buffer = String::from("D:/pliki/3d/blender 2018+/");
 
 	loop {
-		if mouse_delta_position() != vec2(0.0, 0.0) {
+		let mouse_delta = mouse_delta_position();
+
+		if mouse_delta != vec2(0.0, 0.0) || 
+		   is_mouse_button_pressed(MouseButton::Left) || 
+		   is_mouse_button_pressed(MouseButton::Right) 
+		{
 			last_mouse_move = get_time();
 		}
 
@@ -28,45 +39,89 @@ async fn main() {
 
 		// world space
 		set_camera(controls.camera());
-		root.draw();
 
+		if let Some(root) = &root {
+			root.draw();
+		}
+		else {
+			draw_rectangle_lines(0.0, 0.0, 1.0, 1.0, 0.05, Color::new(0.3, 0.3, 0.3, 1.0));
+		}
+
+		if is_mouse_button_pressed(MouseButton::Right) {
+			dragged_since_rmb_down = vec2(0.0, 0.0);
+		}
+		else if is_mouse_button_down(MouseButton::Right) {
+			dragged_since_rmb_down += mouse_delta;
+		}
 		controls.update();
-
-		let tooltip = root.handle_mouse(
-			*controls.mouse_world(), 
-			is_mouse_button_pressed(MouseButton::Left), 
-			is_mouse_button_pressed(MouseButton::Right)
-		).0;
-
 
 		// UI space
 		set_camera(&Camera2D::from_display_rect(Rect::new(0.0, 0.0, screen_width(), screen_height())));
+		
+		// get tooltip
+		let mut tooltip = None;
+		if let Some(root) = &mut root {
+			let tooltip_text = root.handle_mouse(
+				*controls.mouse_world(), 
+				is_mouse_button_pressed(MouseButton::Left), 
+				is_mouse_button_released(MouseButton::Right) && dragged_since_rmb_down.length_squared() == 0.0
+			).0;
+			
+			if get_time() - last_mouse_move > 2.0 {
+				if let Some(text) = tooltip_text {
+					let tooltip_pos = Vec2::from(mouse_position()) + vec2(10.0, 10.0);
 
-		// draw tooltip
-		if get_time() - last_mouse_move > 2.0 {
-			if let Some(tooltip) = tooltip {
-				let measurement = measure_text(&tooltip, None, 16, 1.0);
-				let w = measurement.width;
-				let h = measurement.height + measurement.offset_y;
-	
-				Window::new(hash!(), Vec2::from(mouse_position()) + vec2(-w*0.5, -h-10.0), vec2(w + 10.0, h + 1.0))
-					.movable(false)
-					.titlebar(false)
-					.ui(&mut *root_ui(), |ui| {
-						ui.label(vec2(0.0, 0.0), &tooltip);
-					});
+					tooltip = Some((text, tooltip_pos));
+				}
 			}
 		}
-		
-		// draw sidebar
-		draw_rectangle(0.0, 0.0, 150.0, screen_height(), WHITE);
-		Group::new(1, vec2(150.0, screen_height()))
-			.ui(&mut *root_ui(), |ui| {
-				ui.label(vec2(10.0, 10.0), "Denied:");
-				for (i, path) in denied.iter().enumerate() {
-					ui.label(vec2(20.0, 20.0 + 10.0 * i as f32), &path.to_string_lossy());
-				}
-			});
+
+		egui_macroquad::ui(|ctx| {
+			// draw tooltip
+			if let Some((text, pos)) = tooltip {
+				Window::new("tooltip")
+					.collapsible(false)
+					.movable(false)
+					.title_bar(false)
+					.resizable(false)
+					.fixed_pos(Pos2::new(pos.x, pos.y))
+					.show(ctx, |ui| {
+						ui.label(text);
+					});
+			}
+
+			// draw sidebar
+			Window::new("sidebar")
+				.fixed_pos(Pos2::new(0.0, 0.0))
+				.fixed_size(egui_macroquad::egui::Vec2::new(200.0, screen_height()))
+				.movable(false)
+				.resizable(false)
+				.title_bar(false)
+				.collapsible(false)
+				.show(ctx, |ui| {
+					ui.label("path:");
+					ui.add(TextEdit::singleline(&mut path_input_buffer));
+
+					if ui.button("Scan").clicked() {
+						root = Some(Node::new(Path::new(&path_input_buffer), Rect::new(0.0, 0.0, 1.0, 1.0), &mut denied).unwrap());
+					}
+
+					ui.label("Denied:");
+					ScrollArea::vertical()
+						.max_height(100.0)
+						.auto_shrink([false; 2])
+						.min_scrolled_height(100.0)
+						.stick_to_bottom(true)
+						.show(ui, |ui| {
+							for path in denied.iter() {
+								ui.label(path.to_string_lossy());
+							}
+						});
+
+				});
+		});
+
+		egui_macroquad::draw();
 
 		next_frame().await;
 	}
@@ -74,10 +129,8 @@ async fn main() {
 
 /*
 TODO:
-* ux: empty -> choose path / show all
 * asynchronous indexing + progress indication
 * sort by size/sort alphabetically/shuffle
 * area scales - linear/square/logarithmic
-* collapse on RMB release iff no drag
 * precompute per-frame calculations
 */

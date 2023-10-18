@@ -2,6 +2,7 @@ use std::ops::{Add, Sub, Mul};
 use std::path::{Path, PathBuf};
 use std::fs;
 
+use egui_macroquad::macroquad;
 use macroquad::prelude::*;
 use macroquad::rand::gen_range;
 

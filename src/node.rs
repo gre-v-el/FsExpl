@@ -1,5 +1,6 @@
 use std::{fs, path::{PathBuf, Path}};
 
+use egui_macroquad::macroquad;
 use macroquad::prelude::*;
 
 use crate::helper::{random_col, bytes_to_text, shrink_rect_margin};
@@ -70,31 +71,16 @@ impl Node {
 						continue;
 					}
 				};
-	
-				// let metadata = match entry.metadata() {
-				// 	Ok(m) => m,
-				// 	Err(_) => {
-				// 		denied.push(entry.path());
-				// 		continue;
-				// 	}
-				// };
-				
-				// if metadata.is_dir() {
-					let child = Node::new(&entry.path(), Rect::new(1.0, 1.0, 1.0, 1.0), denied);
-					if let Some(child) = child {
-						bytes += child.bytes();
-						children.push(child);
-					}
-				// }
-				// else {
-				// 	bytes += metadata.len();
-				// }
+
+				let child = Node::new(&entry.path(), Rect::new(1.0, 1.0, 1.0, 1.0), denied);
+				if let Some(child) = child {
+					bytes += child.bytes();
+					children.push(child);
+				}
 			}
 	
 			children.sort_unstable_by(|n1, n2| {n1.bytes.cmp(&n2.bytes)});
 		}
-
-
 
 		Some(
 			Self {
@@ -118,7 +104,7 @@ impl Node {
 	}
 
 	pub fn draw(&self) {
-		if self.is_leaf {			
+		if self.is_leaf {
 			
 			let mut half_rect_size = vec2(self.big_rect.w, self.big_rect.h*0.5);
 			let margin = half_rect_size.min_element() * 0.1;
@@ -158,7 +144,7 @@ impl Node {
 					self.big_rect.center().y + margin + (lower_text_dim.offset_y)*scale, 
 					TextParams { 
 						font: None,
-						font_size: 16, 
+						font_size: 16,
 						font_scale: scale, 
 						font_scale_aspect: 1.0, 
 						rotation: 0.0, 

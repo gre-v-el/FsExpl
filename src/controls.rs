@@ -1,3 +1,5 @@
+
+use egui_macroquad::macroquad;
 use macroquad::prelude::*;
 use crate::helper::*;
 
@@ -78,7 +80,7 @@ impl Controls {
 		&self.mouse_world
 	}
 
-	pub fn drag(&self) -> &Vec2 {
+	pub fn _drag(&self) -> &Vec2 {
 		&self.drag
 	}
 }
