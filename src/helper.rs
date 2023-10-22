@@ -87,7 +87,7 @@ pub fn _dir_size(path: &Path) -> (u64, Vec<PathBuf>) {
     (dir_size(Path::new(path), &mut denied), denied)
 }
 
-pub fn _draw_centered_text(text: &str, size: f32, pos: Vec2) {
+pub fn draw_centered_text(text: &str, size: f32, pos: Vec2) {
 	let text_size = measure_text(text, None, 16, 1.0/16.0*size);
 	draw_text_ex(
 		text, 

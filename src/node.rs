@@ -1,11 +1,10 @@
-use std::{fs, path::{PathBuf, Path}};
+use std::{fs, path::Path, sync::mpsc::Sender, fmt::Debug};
 
 use egui_macroquad::macroquad;
 use macroquad::prelude::*;
 
-use crate::helper::{random_col, bytes_to_text, shrink_rect_margin};
+use crate::{helper::{random_col, bytes_to_text, shrink_rect_margin}, tree::Message};
 
-#[derive(Debug)]
 pub struct Node {
 	path_prefix: String,
 	name: String,
@@ -19,7 +18,7 @@ pub struct Node {
 }
 
 impl Node {
-	pub fn new(path: &Path, rect: Rect, denied: &mut Vec<PathBuf>) -> Option<Self> {
+	pub fn new(path: &Path, rect: Rect, sender: &mut Sender<Message>, bytes_cummulative: &mut u64, counter: &mut u64) -> Option<Self> {
 
 		let mut small_rect = rect.clone();
 		shrink_rect_margin(&mut small_rect, 0.05);
@@ -48,17 +47,22 @@ impl Node {
 			let metadata = match path.metadata() {
 				Ok(m) => m,
 				Err(_) => {
-					denied.push(path.to_owned());
+					sender.send(Message::Denied(path.to_owned())).unwrap();
 					return None;
 				}
 			};
 			bytes = metadata.len();
+			*bytes_cummulative += bytes;
+			*counter += 1;
+			if *counter % 100 == 0 {
+				sender.send(Message::Progress(*bytes_cummulative)).unwrap();
+			}
 		}
 		else {
 			let iterator = match fs::read_dir(path) {
 				Ok(i) => i,
 				Err(_) => {
-					denied.push(path.to_path_buf());
+					sender.send(Message::Denied(path.to_owned())).unwrap();
 					return None;
 				},
 			};
@@ -67,12 +71,12 @@ impl Node {
 				let entry = match entry {
 					Ok(e) => e,
 					Err(_) => {
-						denied.push(path.to_path_buf());
+						sender.send(Message::Denied(path.to_owned())).unwrap();
 						continue;
 					}
 				};
 
-				let child = Node::new(&entry.path(), Rect::new(1.0, 1.0, 1.0, 1.0), denied);
+				let child = Node::new(&entry.path(), Rect::new(1.0, 1.0, 1.0, 1.0), sender, bytes_cummulative, counter);
 				if let Some(child) = child {
 					bytes += child.bytes();
 					children.push(child);
@@ -282,5 +286,15 @@ impl Node {
 
 	pub fn bytes(&self) -> u64 {
 		self.bytes
+	}
+
+	pub fn color(&self) -> Color {
+		self.color
+	}
+}
+
+impl Debug for Node {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		return f.write_str("node");
 	}
 }
