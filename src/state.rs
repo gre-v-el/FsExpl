@@ -23,7 +23,7 @@ impl State {
 			tree: Tree::Empty,
 			last_mouse_move: 0.0,
 			dragged_since_rmb_down: vec2(0.0, 0.0),
-			path_input_buffer: "D:/pliki/programowanie/rust/projs/macroquad/".into(),
+			path_input_buffer: "C:".into(),
 		}
 	}
 
@@ -108,18 +108,6 @@ impl State {
 		else if let Tree::Ready(root, _, _) = &self.tree {
 			root.draw();
 		}
-
-		// match &self.tree {
-		// 	Tree::Empty => draw_rectangle_lines(0.0, 0.0, 1.0, 1.0, 0.05, Color::new(0.3, 0.3, 0.3, 1.0)),
-		// 	Tree::Ready(root, _, _) => root.draw(),
-		// 	Tree::Processing(bytes, files, _) => {
-		// 		draw_rectangle_lines(0.0, 0.0, 1.0, 1.0, 0.05, Color::new(0.5, 0.5, 0.5, 1.0));
-		// 		draw_centered_text(&bytes_to_text(*bytes), 0.15, vec2(0.5, 0.7));
-		// 		draw_centered_text(&format!("{files} files"), 0.15, vec2(0.5, 0.85));
-
-		// 		self.icon.draw(&self.controls.camera());
-		// 	}
-		// }
 	}
 
 	fn draw_ui(&mut self, tooltip: Option<(String, Vec2)>) {
@@ -142,9 +130,9 @@ impl State {
 			// draw sidebar
 			Window::new("sidebar")
 				.fixed_pos(Pos2::new(0.0, 0.0))
-				.fixed_size(egui_macroquad::egui::Vec2::new(200.0, screen_height()))
+				.default_size(egui_macroquad::egui::Vec2::new(200.0, screen_height()))
 				.movable(false)
-				.resizable(false)
+				// .resizable(false)
 				.title_bar(false)
 				.collapsible(false)
 				.show(ctx, |ui| {
@@ -158,9 +146,9 @@ impl State {
 
 					ui.label("Denied:");
 					ScrollArea::vertical()
-						.max_height(100.0)
+						.max_height(200.0)
 						.auto_shrink([false; 2])
-						.min_scrolled_height(100.0)
+						.min_scrolled_height(200.0)
 						.stick_to_bottom(true)
 						.show(ui, |ui| {
 							for path in self.denied.iter() {
