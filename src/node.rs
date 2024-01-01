@@ -31,8 +31,8 @@ impl Node {
 		}
 		
 		let mut last_slash = None;
-		for (i, ch) in pre_path.chars().enumerate() {
-			if ch == '/' || ch == '\\' {
+		for (i, ch) in pre_path.bytes().enumerate() {
+			if ch == b'/' || ch == b'\\' {
 				last_slash = Some(i);
 			}
 		}
